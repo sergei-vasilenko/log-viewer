@@ -42,7 +42,10 @@ export type CallError = {
   details?: string;
 } | null;
 export type CallResult = unknown | null;
-export type ResponseHandler = (err: CallError, data: CallResult) => void;
+export type ResponseHandler = {
+  result: (data: CallResult) => void;
+  error: (err: CallError) => void;
+};
 
 // SERVICE
 export type WelcomeDetail = {

@@ -3,8 +3,8 @@ import { WelcomeDetail, LogsData, LoginResult } from "./types";
 import { HOST, URI_PREFIX, ENDPOINTS } from "./constants";
 
 interface IApiService {
-  login(username: string, password: string): void;
-  logout(): void;
+  login(username: string, password: string): Promise<void>;
+  logout(): Promise<void>;
   logs(callback: (event: LogsData) => void): void;
   isAuth: boolean;
 }
@@ -43,40 +43,44 @@ class ApiService implements IApiService {
     });
   }
 
-  auth() {
+  async auth() {
     if (!this._token && (!this._username || !this._password)) {
       console.warn("Введите логин и пароль");
       return false;
     }
     const method = this._token ? ENDPOINTS.LOGIN_BY_TOKEN : ENDPOINTS.LOGIN;
     const args = this._token ? [this._token] : [this._username, this._password];
-    this._wamp.call(method, args, (err, result) => {
-      if (err) {
-        this._token = "";
-        this._username = "";
-        this._password = "";
-        console.error(err);
-      }
+    try {
+      const result = await this._wamp.call(method, args);
       const { Token, Username } = result as LoginResult;
       this._token = Token;
       this._username = Username;
       this._wamp.subscribe(ENDPOINTS.SUBSCRIPTION_TO_LOGS, this.logsHandler);
-    });
+    } catch (err) {
+      this._token = "";
+      this._username = "";
+      this._password = "";
+      console.error(err);
+    }
   }
 
-  login(username: string, password: string) {
+  async login(username: string, password: string) {
     if (this._username && this._password) return;
     this._username = username;
     this._password = password;
-    this.auth();
+    await this.auth();
   }
 
-  logout(): void {
-    this._wamp.unsubscribe(ENDPOINTS.SUBSCRIPTION_TO_LOGS);
-    this._wamp.call(ENDPOINTS.LOGOUT);
-    this._token = "";
-    this._username = "";
-    this._password = "";
+  async logout(): Promise<void> {
+    try {
+      this._wamp.unsubscribe(ENDPOINTS.SUBSCRIPTION_TO_LOGS);
+      await this._wamp.call(ENDPOINTS.LOGOUT);
+      this._token = "";
+      this._username = "";
+      this._password = "";
+    } catch (err) {
+      console.error(err);
+    }
   }
 
   logs(callback: (event: LogsData) => void): void {

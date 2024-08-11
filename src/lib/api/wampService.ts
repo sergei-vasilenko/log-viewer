@@ -29,9 +29,8 @@ interface IWampServiceSettings {
 export interface IWampService {
   call(
     uri: Uri,
-    args?: Array<string | number>,
-    callback?: (err: CallError, data: CallResult) => void
-  ): void;
+    args?: Array<string | number>
+  ): Promise<CallResult | CallError>;
   subscribe(uri: Uri, callback: (data: any) => void): void;
   unsubscribe(uri: Uri, callback?: (data: any) => void): void;
   on(eventname: WampEventType, callback: WampEventHandler): void;
@@ -41,7 +40,7 @@ class WampService implements IWampService {
   private socket: IWebSocketClient;
   private uriPrefix: string;
   private retryManager: IRetryManager;
-  private callHandlers: Map<CallId, ResponseHandler | undefined> = new Map();
+  private callHandlers: Map<CallId, ResponseHandler> = new Map();
   private subscribeHandlers: Map<Uri, SubscribeHandler> = new Map();
   private events: {
     welcome: WampEventHandler | null;
@@ -111,7 +110,7 @@ class WampService implements IWampService {
         if (messageType === MessageType.CallResult) {
           const [_, callId, result] = parsedData;
           if (this.callHandlers.has(callId)) {
-            this.callHandlers.get(callId)?.(null, result);
+            this.callHandlers.get(callId)?.result(result);
             this.callHandlers.delete(callId);
           }
           return;
@@ -119,14 +118,11 @@ class WampService implements IWampService {
         if (messageType === MessageType.CallError) {
           const [_, callId, uri, description, details] = parsedData;
           if (this.callHandlers.has(callId)) {
-            this.callHandlers.get(callId)?.(
-              {
-                uri,
-                description,
-                ...(details && { details }),
-              },
-              null
-            );
+            this.callHandlers.get(callId)?.error({
+              uri,
+              description,
+              ...(details && { details }),
+            });
             this.callHandlers.delete(callId);
           }
           return;
@@ -159,7 +155,7 @@ class WampService implements IWampService {
     });
   }
 
-  private addCallHandler(id: CallId, handler?: ResponseHandler): void {
+  private addCallHandler(id: CallId, handler: ResponseHandler): void {
     this.callHandlers.set(id, handler);
   }
 
@@ -169,18 +165,19 @@ class WampService implements IWampService {
 
   call(
     uri: Uri,
-    args: Array<string | number> = [],
-    callback?: (err: CallError, data: CallResult) => void
-  ): void {
-    const callId = this.idGenerator();
-    const data = JSON.stringify([
-      MessageType.Call,
-      callId,
-      this.getFullUri(uri),
-      ...args,
-    ]);
-    this.addCallHandler(callId, callback);
-    this.socket.send(data);
+    args: Array<string | number> = []
+  ): Promise<CallResult | CallError> {
+    return new Promise((resolve, reject) => {
+      const callId = this.idGenerator();
+      const data = JSON.stringify([
+        MessageType.Call,
+        callId,
+        this.getFullUri(uri),
+        ...args,
+      ]);
+      this.addCallHandler(callId, { result: resolve, error: reject });
+      this.socket.send(data);
+    });
   }
 
   subscribe(uri: Uri, callback: SubscribeHandler): void {
