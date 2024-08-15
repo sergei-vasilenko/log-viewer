@@ -99,49 +99,53 @@ class WampService implements IWampService {
     this.socket.on("message", (event) => {
       if (event instanceof MessageEvent) {
         const messageEvent = event as MessageEvent;
-        const parsedData: MessageData = JSON.parse(messageEvent.data);
-        const [messageType] = parsedData;
+        try {
+          const parsedData: MessageData = JSON.parse(messageEvent.data);
+          const [messageType] = parsedData;
 
-        if (messageType === MessageType.Welcome) {
-          const [_, session_id, wamp_version, server_name] = parsedData;
-          this.emit("welcome", { session_id, wamp_version, server_name });
-          return;
-        }
-        if (messageType === MessageType.CallResult) {
-          const [_, callId, result] = parsedData;
-          if (this.callHandlers.has(callId)) {
-            this.callHandlers.get(callId)?.result(result);
-            this.callHandlers.delete(callId);
-          }
-          return;
-        }
-        if (messageType === MessageType.CallError) {
-          const [_, callId, uri, description, details] = parsedData;
-          if (this.callHandlers.has(callId)) {
-            this.callHandlers.get(callId)?.error({
-              uri,
-              description,
-              ...(details && { details }),
-            });
-            this.callHandlers.delete(callId);
-          }
-          return;
-        }
-        if (messageType === MessageType.Event) {
-          const [_, uri, event] = parsedData;
-
-          if (!this.subscribeHandlers.has(uri)) return;
-
-          const handler = this.subscribeHandlers.get(uri);
-
-          if (event?.SubscribeError) {
-            this.retryManager.try(uri);
-            console.error(event.SubscribeError);
+          if (messageType === MessageType.Welcome) {
+            const [_, session_id, wamp_version, server_name] = parsedData;
+            this.emit("welcome", { session_id, wamp_version, server_name });
             return;
           }
+          if (messageType === MessageType.CallResult) {
+            const [_, callId, result] = parsedData;
+            if (this.callHandlers.has(callId)) {
+              this.callHandlers.get(callId)?.result(result);
+              this.callHandlers.delete(callId);
+            }
+            return;
+          }
+          if (messageType === MessageType.CallError) {
+            const [_, callId, uri, description, details] = parsedData;
+            if (this.callHandlers.has(callId)) {
+              this.callHandlers.get(callId)?.error({
+                uri,
+                description,
+                ...(details && { details }),
+              });
+              this.callHandlers.delete(callId);
+            }
+            return;
+          }
+          if (messageType === MessageType.Event) {
+            const [_, uri, event] = parsedData;
 
-          if (handler) handler(event);
-          return;
+            if (!this.subscribeHandlers.has(uri)) return;
+
+            const handler = this.subscribeHandlers.get(uri);
+
+            if (event?.SubscribeError) {
+              this.retryManager.try(uri);
+              console.error(event.SubscribeError);
+              return;
+            }
+
+            if (handler) handler(event);
+            return;
+          }
+        } catch (err) {
+          console.error(err);
         }
       } else {
         console.error(

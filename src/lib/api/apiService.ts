@@ -1,11 +1,14 @@
 import WampService, { IWampService } from "@/lib/api/wampService";
-import { WelcomeDetail, LogsData, LoginResult } from "./types";
+import { WelcomeDetail, LogsResult, LoginResult } from "./types";
 import { HOST, URI_PREFIX, ENDPOINTS } from "./constants";
 
 interface IApiService {
-  login(username: string, password: string): Promise<void>;
+  login(
+    username: string,
+    password: string
+  ): Promise<{ token: string; username: string }>;
   logout(): Promise<void>;
-  logs(callback: (event: LogsData) => void): void;
+  logs(callback: (event: LogsResult) => void): void;
   isAuth: boolean;
 }
 
@@ -14,7 +17,7 @@ class ApiService implements IApiService {
   private _token: string;
   private _username: string;
   private _password: string;
-  private logsHandler: (data: LogsData) => void;
+  private logsHandler: (data: LogsResult) => void;
 
   constructor(host: string, uriPrefix: string) {
     this._token = "";
@@ -46,7 +49,7 @@ class ApiService implements IApiService {
   async auth() {
     if (!this._token && (!this._username || !this._password)) {
       console.warn("Введите логин и пароль");
-      return false;
+      return { token: "", username: "" };
     }
     const method = this._token ? ENDPOINTS.LOGIN_BY_TOKEN : ENDPOINTS.LOGIN;
     const args = this._token ? [this._token] : [this._username, this._password];
@@ -55,20 +58,26 @@ class ApiService implements IApiService {
       const { Token, Username } = result as LoginResult;
       this._token = Token;
       this._username = Username;
-      this._wamp.subscribe(ENDPOINTS.SUBSCRIPTION_TO_LOGS, this.logsHandler);
+      this._wamp.subscribe(ENDPOINTS.SUBSCRIPTION_TO_LOGS, (data) =>
+        this.logsHandler(data)
+      );
     } catch (err) {
       this._token = "";
       this._username = "";
       this._password = "";
       console.error(err);
     }
+    return { token: this._token, username: this._username };
   }
 
-  async login(username: string, password: string) {
-    if (this._username && this._password) return;
+  async login(
+    username: string,
+    password: string
+  ): Promise<{ token: string; username: string }> {
+    if (this._username && this._password) return { token: "", username: "" };
     this._username = username;
     this._password = password;
-    await this.auth();
+    return await this.auth();
   }
 
   async logout(): Promise<void> {
@@ -83,7 +92,7 @@ class ApiService implements IApiService {
     }
   }
 
-  logs(callback: (event: LogsData) => void): void {
+  logs(callback: (event: LogsResult) => void): void {
     this.logsHandler = callback;
   }
 

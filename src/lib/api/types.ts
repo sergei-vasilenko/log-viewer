@@ -53,16 +53,21 @@ export type WelcomeDetail = {
   wamp_version: string;
   server_name: string;
 };
-export type LogsData = {
+export type LogsResult = {
   Action: Action;
-  Items: LogItem[];
+  Items: LogItemData[];
 };
 
-export type LogItem = {
+export type LogItemData = {
   Timestamp: string;
   Level: LogLevel;
   Message: string;
   Source: string;
+};
+
+export type LogItem = {
+  index: number;
+  data: LogItemData;
 };
 
 export type LoginResult = {

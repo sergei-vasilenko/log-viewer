@@ -1,38 +1,86 @@
 <template>
   <div class="viewer">
-    <pre v-for="log of logList" :key="log.Timestamp">{{ log.Message }}</pre>
-    <SearchIndex @matchings="getMatchings" />
+    <div class="controls">
+      <SearchStrings
+        :strings="messagesForIndex"
+        :availableStringIds="logIds"
+        @matchings="setMarkers"
+        @changeFocus="setFocus"
+      />
+      <Filter title="Уровни" :list="levelList" @change="setFilters" />
+    </div>
+    <Display :logs="logs" :markers="markers" :focus="focus" />
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent } from "vue";
-import { ref } from "vue";
-import useApiService from "@/composables/useApiService";
-import { LogItem } from "@/lib/api/types";
-import { Action } from "@/lib/api/enums";
-import SearchIndex from "@/components/Search.vue";
+import { defineComponent, ref } from "vue";
+import SearchStrings from "@/components/SearchStrings.vue";
+import Filter from "@/components/Filter.vue";
+import Display from "@/components/Display.vue";
+import { LogLevel } from "@/lib/api/enums";
+import useLogs from "@/composables/useLogs";
+import type { SearchResult } from "@/lib/trie/trie.types";
+import type { MatchingFocus, FilterOption } from "@/types";
 
 export default defineComponent({
   name: "LogViewer",
   components: {
-    SearchIndex,
+    SearchStrings,
+    Filter,
+    Display,
   },
   setup() {
-    const logList = ref<LogItem[]>([]);
-    const { receiveLogs } = useApiService();
+    const { logs, logIds, messagesForIndex, setFilters } = useLogs();
 
-    const getMatchings = (data) => {};
+    const markers = ref<SearchResult>({});
+    const focus = ref<MatchingFocus>({});
 
-    receiveLogs(({ Action: actionType, Items }) => {
-      if (actionType === Action.Initial) {
-        logList.value = Items;
-      } else if (actionType === Action.Add) {
-        logList.value = [...logList.value, ...Items];
-      }
-    });
+    const setMarkers = (data: SearchResult): void => {
+      markers.value = data;
+    };
 
-    return { logList, getMatchings };
+    const setFocus = (position: MatchingFocus): void => {
+      focus.value = position;
+    };
+
+    const levelList = Object.values(LogLevel).reduce(
+      (acc: FilterOption[], level) => {
+        acc.push({
+          id: level,
+          label: level,
+          value: level,
+        });
+        return acc;
+      },
+      []
+    );
+
+    return {
+      levelList,
+      logs,
+      logIds,
+      messagesForIndex,
+      markers,
+      focus,
+      setFilters,
+      setMarkers,
+      setFocus,
+    };
   },
 });
 </script>
+
+<style lang="scss">
+.viewer {
+  margin-top: 120px;
+  height: calc(100vh - 120px);
+  overflow: hidden;
+}
+
+.controls {
+  display: flex;
+  gap: 100px;
+  padding: 10px;
+}
+</style>

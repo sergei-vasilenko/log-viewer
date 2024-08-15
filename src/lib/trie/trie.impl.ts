@@ -1,32 +1,22 @@
-type CharIndexData = Set<number>;
+import {
+  ITrie,
+  State,
+  StateNode,
+  StateNodeData,
+  SearchResult,
+  GroupItem,
+  GroupItemPattern,
+  TokenId,
+  MatchIndex,
+} from "./trie.types";
 
-type TokenId = string | number;
-
-type StartIndex = number;
-
-type EndIndex = number;
-
-type MatchIndex = [StartIndex, EndIndex];
-
-type StateNodeData = {
-  [tokenId: TokenId]: CharIndexData;
-};
-
-type StateNode = {
-  _data: StateNodeData;
-} & {
-  [key: string]: StateNode;
-};
-
-type State = {
-  [key: string]: StateNode;
-};
-
-class Trie {
+class Trie implements ITrie {
   private _state: State;
+  private _indexedTokens: Set<string | number>;
 
   constructor() {
     this._state = {};
+    this._indexedTokens = new Set();
   }
 
   _generateResult(
@@ -65,19 +55,24 @@ class Trie {
   }
 
   async indexGroup(
-    tokens: { id: string | number; value: string }[]
+    tokens: GroupItem[],
+    pattern: GroupItemPattern = ({ id, value }) => ({ id, value })
   ): Promise<void> {
-    const asyncTasks = tokens.map((item) => {
-      return new Promise((resolve) => {
-        this.index(item.id, item.value);
-        resolve(null);
-      });
-    });
+    const asyncTasks = tokens.map((item) => ({
+      then: (onFulfilled: () => void) => {
+        const token = pattern(item);
+        this.index(token.id, token.value);
+        onFulfilled();
+      },
+    }));
 
     await Promise.all(asyncTasks);
   }
 
-  index(tokenId: TokenId, token: string) {
+  index(tokenId: TokenId, token: string): void {
+    if (this._indexedTokens.has(tokenId)) return;
+
+    this._indexedTokens.add(tokenId);
     const lowercaseToken = token.toLowerCase();
     const writableScopes: StateNode[] = [];
 
@@ -109,7 +104,7 @@ class Trie {
     }
   }
 
-  search(string: string) {
+  search(string: string): SearchResult {
     if (!string) return {};
 
     const lowercaseString = string.toLowerCase();
@@ -121,7 +116,7 @@ class Trie {
     for (let charIdx = 0; charIdx < lowercaseString.length; charIdx++) {
       const char = lowercaseString[charIdx];
 
-      if (!scope) return {};
+      if (!scope || !scope[char]) return {};
 
       if (charIdx === 0) {
         startData = scope[char]._data;
