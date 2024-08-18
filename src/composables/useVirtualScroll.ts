@@ -100,9 +100,6 @@ export default function useVirtualScroll(
     indexEdges.value.start = Math.floor(
       indexEdges.value.end - maxVisibleRows.value
     );
-    // indexEdges.value.end = Math.floor(
-    //   indexEdges.value.start + maxVisibleRows.value
-    // );
     listTranslateY.value = offset;
   };
 

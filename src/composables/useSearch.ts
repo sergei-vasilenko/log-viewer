@@ -24,9 +24,12 @@ export default function useSearch(
   });
   watch(searchResult, (result) => emit("matchings", result));
 
-  watch(strings, (data) =>
-    trie.indexGroup(data, ({ index, value }) => ({ id: index, value }))
-  );
+  watch(strings, (data) => {
+    setTimeout(
+      () => trie.indexGroup(data, ({ index, value }) => ({ id: index, value })),
+      0
+    );
+  });
 
   watch(text, (value) => {
     if (!value) {
@@ -48,7 +51,7 @@ export default function useSearch(
 
   watch(focusTargets, (targets) => {
     if (!targets.length) return;
-    activeMatchingIndex.value = 0;
+    activeMatchingIndex.value = null;
   });
 
   watch(activeMatchingIndex, (index) => {
