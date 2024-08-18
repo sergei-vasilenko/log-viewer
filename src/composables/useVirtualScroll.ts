@@ -41,6 +41,14 @@ export default function useVirtualScroll(
 
   watch(focusedRow, (id) => {
     const numId = Number(id);
+    if (
+      list.value[indexEdges.value.start].index <= numId &&
+      numId <= list.value[indexEdges.value.end].index
+    ) {
+      return;
+    }
+
+    // переписать поиск на бинарный
     const activeIndex = list.value.findIndex((row) => row.index === numId);
     if (activeIndex >= 0) {
       const offset = activeIndex * rowHeight.value;
@@ -73,19 +81,28 @@ export default function useVirtualScroll(
     { immediate: true }
   );
 
-  const unwatch = watch(rowHeight, (height) => {
+  const unwatch = watch(rowHeight, (rowH) => {
     observer.value?.disconnect();
-    maxVisibleRows.value = Math.ceil(rootRect.value.height / height);
+    maxVisibleRows.value = Math.ceil(rootRect.value.height / rowH) - 1;
+    indexEdges.value.end = maxVisibleRows.value;
     unwatch();
   });
 
   const calcListOffset = () => {
     const layoutTop = layout.value?.getBoundingClientRect().top || 0;
     const offset = Math.max(0, rootRect.value.top - layoutTop);
-    indexEdges.value.start = Math.floor(offset / rowHeight.value);
-    indexEdges.value.end = Math.floor(
-      indexEdges.value.start + maxVisibleRows.value
+    indexEdges.value.end = Math.ceil(
+      Math.min(
+        offset / rowHeight.value + maxVisibleRows.value,
+        list.value.length - 1
+      )
     );
+    indexEdges.value.start = Math.floor(
+      indexEdges.value.end - maxVisibleRows.value
+    );
+    // indexEdges.value.end = Math.floor(
+    //   indexEdges.value.start + maxVisibleRows.value
+    // );
     listTranslateY.value = offset;
   };
 

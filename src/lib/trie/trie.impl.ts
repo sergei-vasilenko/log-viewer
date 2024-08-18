@@ -9,6 +9,7 @@ import {
   TokenId,
   MatchIndex,
 } from "./trie.types";
+import { chankArray } from "@/assets/utils";
 
 class Trie implements ITrie {
   private _state: State;
